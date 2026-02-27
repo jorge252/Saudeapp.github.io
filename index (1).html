@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitor de Saúde</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .tab-active { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+    .card-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .input-focus:focus { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade { animation: fadeIn 0.3s ease-out; }
+    @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+    .pulse-icon::before { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: currentColor; opacity: 0.3; animation: pulse-ring 2s infinite; }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
+  <div id="app-container" class="h-full overflow-auto">
+   <div class="min-h-full p-4 md:p-6 max-w-2xl mx-auto"><!-- Header -->
+    <header class="text-center mb-6">
+     <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 mb-4 shadow-lg">
+      <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      </svg>
+     </div>
+     <h1 id="app-title" class="text-2xl md:text-3xl font-bold text-gray-800">Monitor de Saúde</h1>
+     <p class="text-gray-500 mt-1">Acompanhe sua pressão e glicemia</p>
+    </header><!-- Tabs -->
+    <div class="flex gap-2 mb-6 bg-white/60 backdrop-blur rounded-2xl p-1.5 card-shadow"><button id="tab-pressure" onclick="switchTab('pressure')" class="flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-300 tab-active"> 🩺 <span id="pressure-tab-text">Pressão</span> </button> <button id="tab-glucose" onclick="switchTab('glucose')" class="flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-300 text-gray-600 hover:bg-gray-100"> 🩸 <span id="glucose-tab-text">Glicemia</span> </button> <button id="tab-history" onclick="switchTab('history')" class="flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-300 text-gray-600 hover:bg-gray-100"> 📊 Histórico </button>
+    </div><!-- Pressure Form -->
+    <div id="pressure-form" class="bg-white rounded-3xl p-6 card-shadow animate-fade">
+     <h2 id="pressure-title" class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><span class="relative pulse-icon text-red-500">❤️</span> Pressão Arterial</h2>
+     <div class="grid grid-cols-2 gap-4 mb-4">
+      <div><label class="block text-sm font-medium text-gray-600 mb-2">Sistólica (mmHg)</label> <input type="number" id="systolic" placeholder="120" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 input-focus focus:border-emerald-500 outline-none transition text-lg font-semibold text-center">
+      </div>
+      <div><label class="block text-sm font-medium text-gray-600 mb-2">Diastólica (mmHg)</label> <input type="number" id="diastolic" placeholder="80" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 input-focus focus:border-emerald-500 outline-none transition text-lg font-semibold text-center">
+      </div>
+     </div>
+     <div class="mb-4"><label class="block text-sm font-medium text-gray-600 mb-2">Observações (opcional)</label> <input type="text" id="pressure-notes" placeholder="Ex: Após exercício" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 input-focus focus:border-emerald-500 outline-none transition">
+     </div>
+     <div id="pressure-status" class="mb-4 p-4 rounded-xl bg-gray-50 hidden">
+      <p id="pressure-status-text" class="text-center font-medium"></p>
+     </div><button onclick="savePressure()" id="save-pressure-btn" class="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"> 💾 Salvar Medição </button>
+    </div><!-- Glucose Form -->
+    <div id="glucose-form" class="bg-white rounded-3xl p-6 card-shadow animate-fade hidden">
+     <h2 id="glucose-title" class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><span class="relative pulse-icon text-rose-500">🩸</span> Glicemia</h2>
+     <div class="mb-4"><label class="block text-sm font-medium text-gray-600 mb-2">Glicemia (mg/dL)</label> <input type="number" id="glucose" placeholder="100" class="w-full px-4 py-4 rounded-xl border-2 border-gray-200 input-focus focus:border-emerald-500 outline-none transition text-2xl font-bold text-center">
+     </div>
+     <div class="mb-4"><label class="block text-sm font-medium text-gray-600 mb-2">Momento da medição</label>
+      <div class="grid grid-cols-2 gap-2"><button onclick="selectGlucoseMoment('jejum')" id="moment-jejum" class="py-3 px-4 rounded-xl border-2 border-gray-200 font-medium hover:border-emerald-500 hover:bg-emerald-50 transition glucose-moment"> 🌅 Jejum </button> <button onclick="selectGlucoseMoment('pos')" id="moment-pos" class="py-3 px-4 rounded-xl border-2 border-gray-200 font-medium hover:border-emerald-500 hover:bg-emerald-50 transition glucose-moment"> 🍽️ Pós-refeição </button>
+      </div>
+     </div>
+     <div class="mb-4"><label class="block text-sm font-medium text-gray-600 mb-2">Observações (opcional)</label> <input type="text" id="glucose-notes" placeholder="Ex: Antes do almoço" class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 input-focus focus:border-emerald-500 outline-none transition">
+     </div>
+     <div id="glucose-status" class="mb-4 p-4 rounded-xl bg-gray-50 hidden">
+      <p id="glucose-status-text" class="text-center font-medium"></p>
+     </div><button onclick="saveGlucose()" id="save-glucose-btn" class="w-full py-4 rounded-xl font-bold text-white bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"> 💾 Salvar Medição </button>
+    </div><!-- History -->
+    <div id="history-panel" class="hidden animate-fade">
+     <div class="flex gap-2 mb-4"><button onclick="filterHistory('all')" id="filter-all" class="flex-1 py-2 px-3 rounded-xl font-medium bg-emerald-500 text-white transition"> Todas </button> <button onclick="filterHistory('pressure')" id="filter-pressure" class="flex-1 py-2 px-3 rounded-xl font-medium bg-white text-gray-600 hover:bg-gray-100 transition"> Pressão </button> <button onclick="filterHistory('glucose')" id="filter-glucose" class="flex-1 py-2 px-3 rounded-xl font-medium bg-white text-gray-600 hover:bg-gray-100 transition"> Glicemia </button>
+     </div>
+     <div id="history-list" class="space-y-3"><!-- Records will be rendered here -->
+     </div>
+     <div id="empty-history" class="text-center py-12 hidden">
+      <div class="text-6xl mb-4">
+       📋
+      </div>
+      <p class="text-gray-500 text-lg">Nenhuma medição registrada ainda</p>
+      <p class="text-gray-400 text-sm mt-1">Comece adicionando sua primeira medição!</p>
+     </div>
+    </div><!-- Toast -->
+    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-xl shadow-xl hidden transform transition-all duration-300"><span id="toast-message"></span>
+    </div><!-- Delete Confirmation -->
+    <div id="delete-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 hidden z-50">
+     <div class="bg-white rounded-2xl p-6 max-w-sm w-full card-shadow animate-fade">
+      <h3 class="text-lg font-bold text-gray-800 mb-2">Excluir medição?</h3>
+      <p class="text-gray-500 mb-4">Esta ação não pode ser desfeita.</p>
+      <div class="flex gap-3"><button onclick="cancelDelete()" class="flex-1 py-3 rounded-xl font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition"> Cancelar </button> <button onclick="confirmDelete()" id="confirm-delete-btn" class="flex-1 py-3 rounded-xl font-semibold bg-red-500 text-white hover:bg-red-600 transition"> Excluir </button>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+    // State
+    let allRecords = [];
+    let currentFilter = 'all';
+    let glucoseMoment = '';
+    let recordToDelete = null;
+
+    // Default config
+    const defaultConfig = {
+      app_title: 'Monitor de Saúde',
+      pressure_label: 'Pressão Arterial',
+      glucose_label: 'Glicemia',
+      background_color: '#ecfdf5',
+      card_color: '#ffffff',
+      text_color: '#1f2937',
+      primary_color: '#10b981',
+      secondary_color: '#f43f5e'
+    };
+
+    // Element SDK
+    const elementHandler = {
+      defaultConfig,
+      onConfigChange: async (config) => {
+        const c = { ...defaultConfig, ...config };
+        
+        document.getElementById('app-title').textContent = c.app_title;
+        document.getElementById('pressure-title').innerHTML = `<span class="relative pulse-icon text-red-500">❤️</span> ${c.pressure_label}`;
+        document.getElementById('glucose-title').innerHTML = `<span class="relative pulse-icon text-rose-500">🩸</span> ${c.glucose_label}`;
+        document.getElementById('pressure-tab-text').textContent = c.pressure_label.split(' ')[0];
+        document.getElementById('glucose-tab-text').textContent = c.glucose_label;
+
+        document.body.style.background = `linear-gradient(135deg, ${c.background_color} 0%, ${adjustColor(c.background_color, -10)} 100%)`;
+        
+        document.querySelectorAll('.bg-white, .card-shadow').forEach(el => {
+          if (!el.id?.includes('modal')) el.style.backgroundColor = c.card_color;
+        });
+
+        document.querySelectorAll('h1, h2, .text-gray-800').forEach(el => {
+          el.style.color = c.text_color;
+        });
+
+        document.querySelectorAll('.tab-active').forEach(el => {
+          el.style.background = `linear-gradient(135deg, ${c.primary_color} 0%, ${adjustColor(c.primary_color, -20)} 100%)`;
+        });
+      },
+      mapToCapabilities: (config) => {
+        const c = { ...defaultConfig, ...config };
+        return {
+          recolorables: [
+            { get: () => c.background_color, set: (v) => window.elementSdk.setConfig({ background_color: v }) },
+            { get: () => c.card_color, set: (v) => window.elementSdk.setConfig({ card_color: v }) },
+            { get: () => c.text_color, set: (v) => window.elementSdk.setConfig({ text_color: v }) },
+            { get: () => c.primary_color, set: (v) => window.elementSdk.setConfig({ primary_color: v }) },
+            { get: () => c.secondary_color, set: (v) => window.elementSdk.setConfig({ secondary_color: v }) }
+          ],
+          borderables: [],
+          fontEditable: undefined,
+          fontSizeable: undefined
+        };
+      },
+      mapToEditPanelValues: (config) => {
+        const c = { ...defaultConfig, ...config };
+        return new Map([
+          ['app_title', c.app_title],
+          ['pressure_label', c.pressure_label],
+          ['glucose_label', c.glucose_label]
+        ]);
+      }
+    };
+
+    function adjustColor(hex, amount) {
+      const num = parseInt(hex.replace('#', ''), 16);
+      const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+      const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
+      const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
+      return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
+    }
+
+    // Data SDK handler
+    const dataHandler = {
+      onDataChanged: (data) => {
+        allRecords = data.sort((a, b) => new Date(b.date + ' ' + b.time) - new Date(a.date + ' ' + a.time));
+        renderHistory();
+      }
+    };
+
+    // Initialize SDKs
+    async function init() {
+      if (window.elementSdk) {
+        window.elementSdk.init(elementHandler);
+      }
+      if (window.dataSdk) {
+        const result = await window.dataSdk.init(dataHandler);
+        if (!result.isOk) {
+          console.error('Failed to initialize Data SDK');
+        }
+      }
+    }
+    init();
+
+    // Tab switching
+    function switchTab(tab) {
+      const tabs = ['pressure', 'glucose', 'history'];
+      tabs.forEach(t => {
+        const tabBtn = document.getElementById(`tab-${t}`);
+        const config = window.elementSdk?.config || defaultConfig;
+        if (t === tab) {
+          tabBtn.classList.add('tab-active');
+          tabBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
+          tabBtn.style.background = `linear-gradient(135deg, ${config.primary_color || defaultConfig.primary_color} 0%, ${adjustColor(config.primary_color || defaultConfig.primary_color, -20)} 100%)`;
+        } else {
+          tabBtn.classList.remove('tab-active');
+          tabBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
+          tabBtn.style.background = '';
+        }
+      });
+
+      document.getElementById('pressure-form').classList.toggle('hidden', tab !== 'pressure');
+      document.getElementById('glucose-form').classList.toggle('hidden', tab !== 'glucose');
+      document.getElementById('history-panel').classList.toggle('hidden', tab !== 'history');
+    }
+
+    // Glucose moment selection
+    function selectGlucoseMoment(moment) {
+      glucoseMoment = moment;
+      document.querySelectorAll('.glucose-moment').forEach(btn => {
+        btn.classList.remove('border-emerald-500', 'bg-emerald-50');
+        btn.classList.add('border-gray-200');
+      });
+      const selected = document.getElementById(`moment-${moment}`);
+      selected.classList.add('border-emerald-500', 'bg-emerald-50');
+      selected.classList.remove('border-gray-200');
+    }
+
+    // Pressure classification
+    function classifyPressure(sys, dia) {
+      if (sys < 120 && dia < 80) return { text: '✅ Normal', color: 'bg-green-100 text-green-700' };
+      if (sys < 130 && dia < 80) return { text: '⚠️ Elevada', color: 'bg-yellow-100 text-yellow-700' };
+      if (sys < 140 || dia < 90) return { text: '🔶 Hipertensão Estágio 1', color: 'bg-orange-100 text-orange-700' };
+      if (sys >= 140 || dia >= 90) return { text: '🔴 Hipertensão Estágio 2', color: 'bg-red-100 text-red-700' };
+      return { text: '❓ Indefinido', color: 'bg-gray-100 text-gray-700' };
+    }
+
+    // Glucose classification
+    function classifyGlucose(value, fasting) {
+      if (fasting) {
+        if (value < 70) return { text: '🔵 Hipoglicemia', color: 'bg-blue-100 text-blue-700' };
+        if (value < 100) return { text: '✅ Normal em jejum', color: 'bg-green-100 text-green-700' };
+        if (value < 126) return { text: '⚠️ Pré-diabetes', color: 'bg-yellow-100 text-yellow-700' };
+        return { text: '🔴 Diabetes', color: 'bg-red-100 text-red-700' };
+      } else {
+        if (value < 70) return { text: '🔵 Hipoglicemia', color: 'bg-blue-100 text-blue-700' };
+        if (value < 140) return { text: '✅ Normal pós-refeição', color: 'bg-green-100 text-green-700' };
+        if (value < 200) return { text: '⚠️ Tolerância diminuída', color: 'bg-yellow-100 text-yellow-700' };
+        return { text: '🔴 Diabetes', color: 'bg-red-100 text-red-700' };
+      }
+    }
+
+    // Save pressure
+    async function savePressure() {
+      const sys = parseInt(document.getElementById('systolic').value);
+      const dia = parseInt(document.getElementById('diastolic').value);
+      const notes = document.getElementById('pressure-notes').value.trim();
+
+      if (!sys || !dia || sys < 50 || sys > 300 || dia < 30 || dia > 200) {
+        showToast('Por favor, insira valores válidos');
+        return;
+      }
+
+      if (allRecords.length >= 999) {
+        showToast('Limite de registros atingido. Exclua alguns para continuar.');
+        return;
+      }
+
+      const classification = classifyPressure(sys, dia);
+      const statusEl = document.getElementById('pressure-status');
+      const statusText = document.getElementById('pressure-status-text');
+      statusEl.className = `mb-4 p-4 rounded-xl ${classification.color}`;
+      statusText.textContent = `${sys}/${dia} mmHg - ${classification.text}`;
+      statusEl.classList.remove('hidden');
+
+      const btn = document.getElementById('save-pressure-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Salvando...';
+
+      const now = new Date();
+      const result = await window.dataSdk.create({
+        type: 'pressure',
+        systolic: sys,
+        diastolic: dia,
+        glucose: 0,
+        date: now.toISOString().split('T')[0],
+        time: now.toTimeString().slice(0, 5),
+        notes: notes || `${classification.text}`
+      });
+
+      btn.disabled = false;
+      btn.textContent = '💾 Salvar Medição';
+
+      if (result.isOk) {
+        showToast('Pressão salva com sucesso! ✅');
+        document.getElementById('systolic').value = '';
+        document.getElementById('diastolic').value = '';
+        document.getElementById('pressure-notes').value = '';
+        setTimeout(() => statusEl.classList.add('hidden'), 3000);
+      } else {
+        showToast('Erro ao salvar. Tente novamente.');
+      }
+    }
+
+    // Save glucose
+    async function saveGlucose() {
+      const value = parseInt(document.getElementById('glucose').value);
+      const notes = document.getElementById('glucose-notes').value.trim();
+
+      if (!value || value < 20 || value > 600) {
+        showToast('Por favor, insira um valor válido');
+        return;
+      }
+
+      if (!glucoseMoment) {
+        showToast('Selecione o momento da medição');
+        return;
+      }
+
+      if (allRecords.length >= 999) {
+        showToast('Limite de registros atingido. Exclua alguns para continuar.');
+        return;
+      }
+
+      const isFasting = glucoseMoment === 'jejum';
+      const classification = classifyGlucose(value, isFasting);
+      const statusEl = document.getElementById('glucose-status');
+      const statusText = document.getElementById('glucose-status-text');
+      statusEl.className = `mb-4 p-4 rounded-xl ${classification.color}`;
+      statusText.textContent = `${value} mg/dL - ${classification.text}`;
+      statusEl.classList.remove('hidden');
+
+      const btn = document.getElementById('save-glucose-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Salvando...';
+
+      const now = new Date();
+      const result = await window.dataSdk.create({
+        type: 'glucose',
+        systolic: 0,
+        diastolic: 0,
+        glucose: value,
+        date: now.toISOString().split('T')[0],
+        time: now.toTimeString().slice(0, 5),
+        notes: notes || `${isFasting ? 'Jejum' : 'Pós-refeição'} - ${classification.text}`
+      });
+
+      btn.disabled = false;
+      btn.textContent = '💾 Salvar Medição';
+
+      if (result.isOk) {
+        showToast('Glicemia salva com sucesso! ✅');
+        document.getElementById('glucose').value = '';
+        document.getElementById('glucose-notes').value = '';
+        glucoseMoment = '';
+        document.querySelectorAll('.glucose-moment').forEach(btn => {
+          btn.classList.remove('border-emerald-500', 'bg-emerald-50');
+          btn.classList.add('border-gray-200');
+        });
+        setTimeout(() => statusEl.classList.add('hidden'), 3000);
+      } else {
+        showToast('Erro ao salvar. Tente novamente.');
+      }
+    }
+
+    // Filter history
+    function filterHistory(filter) {
+      currentFilter = filter;
+      ['all', 'pressure', 'glucose'].forEach(f => {
+        const btn = document.getElementById(`filter-${f}`);
+        if (f === filter) {
+          btn.classList.add('bg-emerald-500', 'text-white');
+          btn.classList.remove('bg-white', 'text-gray-600');
+        } else {
+          btn.classList.remove('bg-emerald-500', 'text-white');
+          btn.classList.add('bg-white', 'text-gray-600');
+        }
+      });
+      renderHistory();
+    }
+
+    // Render history
+    function renderHistory() {
+      const container = document.getElementById('history-list');
+      const emptyState = document.getElementById('empty-history');
+      
+      let filtered = allRecords;
+      if (currentFilter !== 'all') {
+        filtered = allRecords.filter(r => r.type === currentFilter);
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      
+      const existingCards = new Map();
+      container.querySelectorAll('[data-id]').forEach(el => {
+        existingCards.set(el.dataset.id, el);
+      });
+
+      const newIds = new Set(filtered.map(r => r.__backendId));
+      
+      existingCards.forEach((el, id) => {
+        if (!newIds.has(id)) el.remove();
+      });
+
+      filtered.forEach((record, index) => {
+        const existing = existingCards.get(record.__backendId);
+        
+        if (existing) {
+          updateCard(existing, record);
+        } else {
+          const card = createCard(record);
+          if (index === 0) {
+            container.prepend(card);
+          } else {
+            const prevId = filtered[index - 1].__backendId;
+            const prevEl = container.querySelector(`[data-id="${prevId}"]`);
+            if (prevEl) {
+              prevEl.after(card);
+            } else {
+              container.appendChild(card);
+            }
+          }
+        }
+      });
+    }
+
+    function createCard(record) {
+      const card = document.createElement('div');
+      card.dataset.id = record.__backendId;
+      card.className = 'bg-white rounded-2xl p-4 card-shadow animate-fade';
+      updateCard(card, record);
+      return card;
+    }
+
+    function updateCard(card, record) {
+      const isPressure = record.type === 'pressure';
+      const icon = isPressure ? '🩺' : '🩸';
+      const value = isPressure ? `${record.systolic}/${record.diastolic} mmHg` : `${record.glucose} mg/dL`;
+      const color = isPressure ? 'text-emerald-600' : 'text-rose-600';
+      const bgColor = isPressure ? 'bg-emerald-50' : 'bg-rose-50';
+
+      card.innerHTML = `
+        <div class="flex items-start justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl ${bgColor} flex items-center justify-center text-2xl">
+              ${icon}
+            </div>
+            <div>
+              <p class="text-lg font-bold ${color}">${value}</p>
+              <p class="text-sm text-gray-500">${formatDate(record.date)} às ${record.time}</p>
+              ${record.notes ? `<p class="text-xs text-gray-400 mt-1">${record.notes}</p>` : ''}
+            </div>
+          </div>
+          <button onclick="requestDelete('${record.__backendId}')" 
+            class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
+            🗑️
+          </button>
+        </div>
+      `;
+    }
+
+    function formatDate(dateStr) {
+      const [year, month, day] = dateStr.split('-');
+      return `${day}/${month}/${year}`;
+    }
+
+    // Delete functions
+    function requestDelete(id) {
+      recordToDelete = allRecords.find(r => r.__backendId === id);
+      document.getElementById('delete-modal').classList.remove('hidden');
+    }
+
+    function cancelDelete() {
+      recordToDelete = null;
+      document.getElementById('delete-modal').classList.add('hidden');
+    }
+
+    async function confirmDelete() {
+      if (!recordToDelete) return;
+
+      const btn = document.getElementById('confirm-delete-btn');
+      btn.disabled = true;
+      btn.textContent = 'Excluindo...';
+
+      const result = await window.dataSdk.delete(recordToDelete);
+      
+      btn.disabled = false;
+      btn.textContent = 'Excluir';
+      document.getElementById('delete-modal').classList.add('hidden');
+
+      if (result.isOk) {
+        showToast('Medição excluída ✅');
+      } else {
+        showToast('Erro ao excluir. Tente novamente.');
+      }
+      
+      recordToDelete = null;
+    }
+
+    // Toast
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-message').textContent = message;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d4840bb321bf638',t:'MTc3MjIwMTI5Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
